@@ -1,3 +1,11 @@
+/*!
+ * csv-walker
+ * Copyright (c) 2026 Jesse G. Donat
+ * Released under the MIT License.
+ * 
+ * This notice may not be removed or altered from any source distribution.
+ */
+
 export type Chunk = string | Uint8Array
 
 export type Source = Blob | Iterable<Chunk> | AsyncIterable<Chunk> | ReadableStream<Chunk>
