@@ -1,0 +1,18 @@
+{
+	"name": "csv-walker",
+	"version": "0.1.0",
+	"description": "A tiny CSV parser for browsers and Node.js.",
+	"type": "module",
+	"exports": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc",
+		"test": "npm run build && node --test test/*.test.js"
+	},
+	"devDependencies": {
+		"typescript": "^7.0.2"
+	}
+}
