@@ -4,6 +4,8 @@ export type Source = Blob | Iterable<Chunk> | AsyncIterable<Chunk> | ReadableStr
 
 export type Row = Generator<string>
 
+export type AsyncRow = AsyncGenerator<string>
+
 type Settings = {
 	separator: string
 	enclosure: string
@@ -34,51 +36,70 @@ export function escape(value: string): Option {
 	return option("escape", value, true)
 }
 
-type State = (character: string, rows: string[][]) => State
+type Cell = {
+	last: boolean
+	value: string
+}
 
-function csv(settings: Settings) {
-	let row: string[] = []
+type CSV = {
+	finish: () => Cell | undefined
+	push: (character: string) => Cell | undefined
+}
+
+type State = (character: string) => State
+
+function csv(settings: Settings): CSV {
 	let column = ""
+	let record = false
 	let state: State = readColumn
 
-	function push(text: string): string[][] {
-		const rows: string[][] = []
+	function push(character: string): Cell | undefined {
+		let cell: Cell | undefined
 
-		for (const character of text) {
-			state = state(character, rows)
-		}
+		state = state(character)
+		cell = output
+		output = undefined
 
-		return rows
+		return cell
 	}
 
-	function finish(): string[] | undefined {
-		if (row.length === 0 && column === "" && state !== readQuotedColumn && state !== readQuote) {
+	function finish(): Cell | undefined {
+		if (!record) {
 			return undefined
 		}
 
-		return rowDone()
+		const cell = { last: true, value: column }
+		column = ""
+		record = false
+
+		return cell
 	}
 
-	function readColumn(character: string, rows: string[][]): State {
+	let output: Cell | undefined
+
+	function readColumn(character: string): State {
 		if (character === settings.separator) {
-			columnDone()
+			record = true
+			columnDone(false)
 			return readColumn
 		}
 
 		if (character === "\n") {
-			rows.push(rowDone())
+			columnDone(true)
 			return readColumn
 		}
 
 		if (character === "\r") {
-			rows.push(rowDone())
+			columnDone(true)
 			return readLineFeed
 		}
 
 		if (character === settings.enclosure && column === "") {
+			record = true
 			return readQuotedColumn
 		}
 
+		record = true
 		column += character
 		return readColumn
 	}
@@ -97,13 +118,13 @@ function csv(settings: Settings) {
 		return readQuotedColumn
 	}
 
-	function readQuote(character: string, rows: string[][]): State {
+	function readQuote(character: string): State {
 		if (character === settings.enclosure) {
 			column += character
 			return readQuotedColumn
 		}
 
-		return readColumn(character, rows)
+		return readColumn(character)
 	}
 
 	function readEscapedEnclosure(character: string): State {
@@ -111,37 +132,128 @@ function csv(settings: Settings) {
 		return readQuotedColumn
 	}
 
-	function readLineFeed(character: string, rows: string[][]): State {
+	function readLineFeed(character: string): State {
 		if (character === "\n") {
 			return readColumn
 		}
 
-		return readColumn(character, rows)
+		return readColumn(character)
 	}
 
-	function columnDone() {
-		row.push(column)
+	function columnDone(last: boolean) {
+		output = { last, value: column }
 		column = ""
-	}
 
-	function rowDone(): string[] {
-		columnDone()
-
-		const value = row
-		row = []
-
-		return value
+		if (last) {
+			record = false
+		}
 	}
 
 	return { finish, push }
 }
 
-function* columns(values: string[]): Row {
-	yield* values
+function nextCell(reader: CSV, characters: Iterator<string>): Cell | undefined {
+	while (true) {
+		const character = characters.next()
+
+		if (character.done) {
+			return reader.finish()
+		}
+
+		const cell = reader.push(character.value)
+
+		if (cell) {
+			return cell
+		}
+	}
+}
+
+async function nextAsyncCell(reader: CSV, characters: AsyncIterator<string>): Promise<Cell | undefined> {
+	while (true) {
+		const character = await characters.next()
+
+		if (character.done) {
+			return reader.finish()
+		}
+
+		const cell = reader.push(character.value)
+
+		if (cell) {
+			return cell
+		}
+	}
+}
+
+function skipRow(reader: CSV, characters: Iterator<string>) {
+	while (true) {
+		const cell = nextCell(reader, characters)
+
+		if (!cell || cell.last) {
+			return
+		}
+	}
+}
+
+async function skipAsyncRow(reader: CSV, characters: AsyncIterator<string>) {
+	while (true) {
+		const cell = await nextAsyncCell(reader, characters)
+
+		if (!cell || cell.last) {
+			return
+		}
+	}
+}
+
+function* columns(first: Cell, reader: CSV, characters: Iterator<string>, complete: { value: boolean }): Row {
+	let cell = first
+
+	while (true) {
+		if (cell.last) {
+			complete.value = true
+		}
+
+		yield cell.value
+
+		if (cell.last) {
+			return
+		}
+
+		const next = nextCell(reader, characters)
+
+		if (!next) {
+			throw new Error("CSV ended before the record did")
+		}
+
+		cell = next
+	}
+}
+
+async function* asyncColumns(first: Cell, reader: CSV, characters: AsyncIterator<string>, complete: { value: boolean }): AsyncRow {
+	let cell = first
+
+	while (true) {
+		if (cell.last) {
+			complete.value = true
+		}
+
+		yield cell.value
+
+		if (cell.last) {
+			return
+		}
+
+		const next = await nextAsyncCell(reader, characters)
+
+		if (!next) {
+			throw new Error("CSV ended before the record did")
+		}
+
+		cell = next
+	}
 }
 
 function settings(options: Option[]): Settings {
-	const value = { enclosure: '"', escape: "\\", separator: "," }
+	const value: Settings = { enclosure: '"', escape: "\\", separator: "," }
 
 	for (const option of options) {
 		option(value)
@@ -152,15 +264,21 @@ function settings(options: Option[]): Settings {
 
 function* parseString(text: string, options: Settings): Generator<Row> {
 	const reader = csv(options)
+	const characters = text[Symbol.iterator]()
 
-	for (const values of reader.push(text)) {
-		yield columns(values)
-	}
+	while (true) {
+		const first = nextCell(reader, characters)
 
-	const values = reader.finish()
+		if (!first) {
+			return
+		}
 
-	if (values) {
-		yield columns(values)
+		const complete = { value: first.last }
+		yield columns(first, reader, characters, complete)
+
+		if (!complete.value) {
+			skipRow(reader, characters)
+		}
 	}
 }
 
@@ -201,8 +319,7 @@ async function* chunks(source: Source): AsyncGenerator<Chunk> {
 	}
 }
 
-async function* parseSource(source: Source, options: Settings): AsyncGenerator<Row> {
-	const reader = csv(options)
+async function* characters(source: Source): AsyncGenerator<string> {
 	let decoder: TextDecoder | undefined
 
 	for await (const chunk of chunks(source)) {
@@ -214,27 +331,47 @@ async function* parseSource(source: Source, options: Settings): AsyncGenerator<R
 			decoder = undefined
 		}
 
-		for (const values of reader.push(text)) {
-			yield columns(values)
+		for (const character of text) {
+			yield character
 		}
 	}
 
 	if (decoder) {
-		for (const values of reader.push(decoder.decode())) {
-			yield columns(values)
+		for (const character of decoder.decode()) {
+			yield character
 		}
 	}
+}
 
-	const values = reader.finish()
+async function* parseSource(source: Source, options: Settings): AsyncGenerator<AsyncRow> {
+	const reader = csv(options)
+	const input = characters(source)[Symbol.asyncIterator]()
 
-	if (values) {
-		yield columns(values)
+	try {
+		while (true) {
+			const first = await nextAsyncCell(reader, input)
+
+			if (!first) {
+				return
+			}
+
+			const complete = { value: first.last }
+			yield asyncColumns(first, reader, input, complete)
+
+			if (!complete.value) {
+				await skipAsyncRow(reader, input)
+			}
+		}
+	} finally {
+		if (input.return) {
+			await input.return(undefined)
+		}
 	}
 }
 
 export function parse(source: string, ...options: Option[]): Generator<Row>
-export function parse(source: Source, ...options: Option[]): AsyncGenerator<Row>
-export function parse(source: string | Source, ...options: Option[]): Generator<Row> | AsyncGenerator<Row> {
+export function parse(source: Source, ...options: Option[]): AsyncGenerator<AsyncRow>
+export function parse(source: string | Source, ...options: Option[]): Generator<Row> | AsyncGenerator<AsyncRow> {
 	const value = settings(options)
 
 	return typeof source === "string" ? parseString(source, value) : parseSource(source, value)

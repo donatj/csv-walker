@@ -4,14 +4,26 @@ import test from "node:test"
 import { enclosure, escape, parse, separator } from "../dist/index.js"
 
 function rows(source, ...options) {
-	return [...parse(source, ...options)].map((row) => [...row])
-}
-
-async function asyncRows(source) {
 	const result = []
 
-	for await (const row of parse(source)) {
+	for (const row of parse(source, ...options)) {
 		result.push([...row])
+	}
+
+	return result
+}
+
+async function asyncRows(source, ...options) {
+	const result = []
+
+	for await (const row of parse(source, ...options)) {
+		const values = []
+
+		for await (const value of row) {
+			values.push(value)
+		}
+
+		result.push(values)
 	}
 
 	return result
@@ -37,6 +49,41 @@ test("configures fgetcsv-style controls", () => {
 	])
 
 	assert.deepEqual(rows('"c\\"d"', escape("\\")), [['c\\"d']])
+})
+
+test("skips unread columns before the next row", () => {
+	const reader = parse("a,b\n1,2")
+
+	reader.next()
+	assert.deepEqual([...reader.next().value], ["1", "2"])
+})
+
+test("skips unread columns in every row", () => {
+	const values = []
+
+	for (const row of parse("a,b,c\nd,e,f\ng,h,i")) {
+		values.push(row.next().value)
+	}
+
+	assert.deepEqual(values, ["a", "d", "g"])
+})
+
+test("skips unread async columns before the next row", async () => {
+	async function* stream() {
+		yield "a,b\n1,2"
+	}
+
+	const reader = parse(stream())
+
+	await reader.next()
+	const { value: row } = await reader.next()
+	const values = []
+
+	for await (const value of row) {
+		values.push(value)
+	}
+
+	assert.deepEqual(values, ["1", "2"])
 })
 
 test("parses chunks from an async stream", async () => {
