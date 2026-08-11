@@ -170,6 +170,33 @@ test("parses a browser-style readable stream", async () => {
 	]);
 });
 
+test("parses a readable stream without async iteration", async () => {
+	const chunks = ["name,age\n", "Ada,36"];
+	let released = false;
+	const stream = {
+		getReader() {
+			return {
+				async read() {
+					const value = chunks.shift();
+
+					return value === undefined
+						? { done: true, value: undefined }
+						: { done: false, value };
+				},
+				releaseLock() {
+					released = true;
+				},
+			};
+		},
+	};
+
+	assert.deepEqual(await asyncRows(stream), [
+		["name", "age"],
+		["Ada", "36"],
+	]);
+	assert.equal(released, true);
+});
+
 test("parses a Node file stream", async () => {
 	const file = new URL("./fixtures/people.csv", import.meta.url);
 
@@ -197,6 +224,18 @@ test("decodes byte chunks", async () => {
 		["name"],
 		["José"],
 	]);
+});
+
+test("parses byte chunks followed by strings", async () => {
+	const bytes = new TextEncoder().encode("name\n");
+
+	assert.deepEqual(await asyncRows([bytes, "Ada"]), [["name"], ["Ada"]]);
+});
+
+test("replaces incomplete byte sequences at the end of input", async () => {
+	const bytes = new Uint8Array([0x6e, 0x61, 0x6d, 0x65, 0x0a, 0xc3]);
+
+	assert.deepEqual(await asyncRows([bytes]), [["name"], ["�"]]);
 });
 
 test("decodes Windows-1252 byte chunks", async () => {
