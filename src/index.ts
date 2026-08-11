@@ -43,18 +43,25 @@ function option(
 	);
 }
 
+/** Sets the field separator. */
 export function separator(value: string): Option {
 	return option("separator", value);
 }
 
+/** Sets the quoted-field enclosure. */
 export function enclosure(value: string): Option {
 	return option("enclosure", value);
 }
 
+/**
+ * Sets the character that keeps a following enclosure literal in a quoted
+ * field. Pass an empty string to disable escaping.
+ */
 export function escape(value: string): Option {
 	return option("escape", value, true);
 }
 
+/** Sets the encoding used to decode byte input. */
 export function encoding(value: string): Option {
 	try {
 		const decoder = new TextDecoder(value);
@@ -428,6 +435,20 @@ async function* parseSource(
 	}
 }
 
+/**
+ * Parses CSV input.
+ *
+ * Strings return synchronous row and column generators. Blobs, streams, and
+ * iterables of string or Uint8Array chunks return asynchronous generators.
+ * Each row yields its column strings.
+ *
+ * Pass separator(), enclosure(), escape(), or encoding() options after the
+ * input to configure parsing.
+ *
+ * Stream input is consumed. If you stop parsing early, do not assume it can
+ * be reused. Manage cancellation or destruction at the call site when that
+ * matters.
+ */
 export function parse(source: string, ...options: Option[]): Generator<Row>;
 export function parse(
 	source: Source,

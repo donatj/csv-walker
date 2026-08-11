@@ -82,11 +82,12 @@ for (const row of parse(input, separator(";"), enclosure("'"), escape(""))) {
 }
 ```
 
-| Option             | Default | Use                                                 |
-| ------------------ | ------- | --------------------------------------------------- |
-| `separator(value)` | `","`   | Set the field separator.                            |
-| `enclosure(value)` | `"\""`  | Set the quoted-field character.                     |
-| `escape(value)`    | `"\\"`  | Set the PHP-style escape. Pass `""` to turn it off. |
+| Option             | Default   | Use                                                           |
+| ------------------ | --------- | ------------------------------------------------------------- |
+| `separator(value)` | `","`     | Set the field separator.                                      |
+| `enclosure(value)` | `"\""`    | Set the quoted-field character.                               |
+| `escape(value)`    | `"\\"`    | Keep a following enclosure literal. Pass `""` to turn it off. |
+| `encoding(value)`  | `"utf-8"` | Set the encoding for byte input.                              |
 
 Separators and enclosures take one character. Escapes take one character or an
 empty string. Doubled enclosures work. `"said ""hello"""` becomes
@@ -118,6 +119,10 @@ It holds the current column and moves forward as you read it.
 
 Rows share one input cursor. Requesting the next row drops unread columns from
 the current row.
+
+Source streams are consumed. If you stop parsing early, do not assume a stream
+can be reused. Manage cancellation or destruction at the call site when that
+matters.
 
 ```ts
 for (const row of parse("id,name,role\n1,Ada,Engineer\n2,Grace,Admiral")) {
