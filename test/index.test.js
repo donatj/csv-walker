@@ -54,6 +54,21 @@ test("collects synchronous rows and columns", () => {
 	assert.deepEqual(allValues(parse("name,age").next().value), ["name", "age"]);
 });
 
+test("collects asynchronous rows and columns", async () => {
+	async function* stream() {
+		yield "name,age\nAda,36";
+	}
+
+	assert.deepEqual(await allValues(parse(stream())), [
+		["name", "age"],
+		["Ada", "36"],
+	]);
+
+	const reader = parse(stream());
+	const { value: row } = await reader.next();
+	assert.deepEqual(await allValues(row), ["name", "age"]);
+});
+
 test("parses quoted columns", () => {
 	assert.deepEqual(rows('"last, first","said ""hi"""'), [
 		["last, first", 'said "hi"'],

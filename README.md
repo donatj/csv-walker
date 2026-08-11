@@ -137,7 +137,8 @@ for (const row of parse("id,name,role\n1,Ada,Engineer\n2,Grace,Admiral")) {
 ## Collect values
 
 `allValues()` reads a column generator or a whole row generator into memory.
-Avoid it for large data sets. Iterate instead.
+Async inputs resolve to the same concrete arrays. Avoid it for large data sets.
+Iterate instead.
 
 ```ts
 import { allValues, parse } from "csv-walker";
@@ -151,10 +152,12 @@ for (const row of parse("name,age")) {
 }
 ```
 
-| Input                                                            | Return value                             |
-| ---------------------------------------------------------------- | ---------------------------------------- |
-| String                                                           | `Generator<Generator<string>>`           |
-| `File`, `Blob`, `ReadableStream`, Node stream, or chunk iterable | `AsyncGenerator<AsyncGenerator<string>>` |
+| Input                                | Return value          |
+| ------------------------------------ | --------------------- |
+| One `Row`                            | `string[]`            |
+| One `AsyncRow`                       | `Promise<string[]>`   |
+| A synchronous parser (`Rows`)        | `string[][]`          |
+| An asynchronous parser (`AsyncRows`) | `Promise<string[][]>` |
 
 ## Supported CSV
 

@@ -16,7 +16,11 @@ export type Source =
 
 export type Row = Generator<string>;
 
+export type Rows = Generator<Row>;
+
 export type AsyncRow = AsyncGenerator<string>;
+
+export type AsyncRows = AsyncGenerator<AsyncRow>;
 
 type Settings = {
 	encoding: string;
@@ -319,7 +323,7 @@ function configure(options: Option[]): Settings {
 	return value;
 }
 
-function* parseString(text: string, options: Settings): Generator<Row> {
+function* parseString(text: string, options: Settings): Rows {
 	const reader = csv(options);
 	const input = text[Symbol.iterator]();
 
@@ -406,10 +410,7 @@ async function* characters(
 	}
 }
 
-async function* parseSource(
-	source: Source,
-	options: Settings,
-): AsyncGenerator<AsyncRow> {
+async function* parseSource(source: Source, options: Settings): AsyncRows {
 	const reader = csv(options);
 	const input = characters(source, options.encoding)[Symbol.asyncIterator]();
 
@@ -436,28 +437,26 @@ async function* parseSource(
 }
 
 /**
- * Parses CSV input.
+ * Parses CSV input into rows and columns.
  *
- * Strings return synchronous row and column generators. Blobs, streams, and
- * iterables of string or Uint8Array chunks return asynchronous generators.
- * Each row yields its column strings.
+ * With a string, returns `Rows`: a synchronous generator of `Row` values.
+ * With a Blob, stream, or iterable of string or Uint8Array chunks, returns
+ * `AsyncRows`: an asynchronous generator of `AsyncRow` values. Rows yield
+ * column strings.
  *
- * Pass separator(), enclosure(), escape(), or encoding() options after the
- * input to configure parsing.
+ * Pass options such as separator(), enclosure(), escape(), or encoding() after
+ * the input to configure parsing.
  *
  * Stream input is consumed. If you stop parsing early, do not assume it can
  * be reused. Manage cancellation or destruction at the call site when that
  * matters.
  */
-export function parse(source: string, ...options: Option[]): Generator<Row>;
-export function parse(
-	source: Source,
-	...options: Option[]
-): AsyncGenerator<AsyncRow>;
+export function parse(source: string, ...options: Option[]): Rows;
+export function parse(source: Source, ...options: Option[]): AsyncRows;
 export function parse(
 	source: string | Source,
 	...options: Option[]
-): Generator<Row> | AsyncGenerator<AsyncRow> {
+): Rows | AsyncRows {
 	const value = configure(options);
 
 	return typeof source === "string"
@@ -466,22 +465,48 @@ export function parse(
 }
 
 /**
- * Collects every column from one row.
+ * Collects every column from one synchronous row.
  *
  * Reads the complete row into memory.
  */
 export function allValues(values: Row): string[];
 
 /**
+ * Collects every column from one asynchronous row.
+ *
+ * Reads the complete row into memory.
+ */
+export function allValues(values: AsyncRow): Promise<string[]>;
+
+/**
  * Collects every row and column from a synchronous parser.
  *
  * Reads the complete input into memory. Avoid it for large data sets.
  */
-export function allValues(values: Generator<Row>): string[][];
-export function allValues(values: Row | Generator<Row>): string[] | string[][] {
+export function allValues(values: Rows): string[][];
+
+/**
+ * Collects every row and column from an asynchronous parser.
+ *
+ * Reads the complete input into memory. Avoid it for large data sets.
+ */
+export function allValues(values: AsyncRows): Promise<string[][]>;
+export function allValues(
+	values: Row | AsyncRow | Rows | AsyncRows,
+): string[] | string[][] | Promise<string[] | string[][]> {
 	const result: Array<string | string[]> = [];
 
-	for (const value of values) {
+	if (Symbol.asyncIterator in values) {
+		return (async () => {
+			for await (const value of values as AsyncIterable<string | AsyncRow>) {
+				result.push(typeof value === "string" ? value : await allValues(value));
+			}
+
+			return result as string[] | string[][];
+		})();
+	}
+
+	for (const value of values as Iterable<string | Row>) {
 		result.push(typeof value === "string" ? value : [...value]);
 	}
 
