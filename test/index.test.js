@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { File } from "node:buffer"
+import { createReadStream } from "node:fs"
 import test from "node:test"
 
 import { enclosure, escape, parse, separator } from "../dist/index.js"
@@ -43,12 +45,39 @@ test("parses quoted columns", () => {
 	])
 })
 
+test("parses blank fields and blank rows", () => {
+	assert.deepEqual(rows(""), [])
+	assert.deepEqual(rows("\n"), [[""]])
+	assert.deepEqual(rows("a,b,\n,,"), [
+		["a", "b", ""],
+		["", "", ""]
+	])
+})
+
+test("parses every common line ending", () => {
+	assert.deepEqual(rows("a,b\r1,2\r\n3,4\n"), [
+		["a", "b"],
+		["1", "2"],
+		["3", "4"]
+	])
+})
+
+test("parses newlines and unterminated enclosures", () => {
+	assert.deepEqual(rows('"a\nb",c'), [["a\nb", "c"]])
+	assert.deepEqual(rows('"a,b'), [["a,b"]])
+})
+
 test("configures fgetcsv-style controls", () => {
 	assert.deepEqual(rows("'last; first';'said ''hi'''", separator(";"), enclosure("'")), [
 		["last; first", "said 'hi'"]
 	])
 
 	assert.deepEqual(rows('"c\\"d"', escape("\\")), [['c\\"d']])
+	assert.deepEqual(rows('"said ""hello"""', escape("")), [['said "hello"']])
+
+	assert.throws(() => separator(""), TypeError)
+	assert.throws(() => enclosure("''"), TypeError)
+	assert.throws(() => escape("\\\\"), TypeError)
 })
 
 test("skips unread columns before the next row", () => {
@@ -86,6 +115,24 @@ test("skips unread async columns before the next row", async () => {
 	assert.deepEqual(values, ["1", "2"])
 })
 
+test("parses a browser File", async () => {
+	const file = new File(["name,age\nAda,36"], "people.csv", { type: "text/csv" })
+
+	assert.deepEqual(await asyncRows(file), [
+		["name", "age"],
+		["Ada", "36"]
+	])
+})
+
+test("parses a browser Blob", async () => {
+	const blob = new Blob(["name,age\nGrace,85"], { type: "text/csv" })
+
+	assert.deepEqual(await asyncRows(blob), [
+		["name", "age"],
+		["Grace", "85"]
+	])
+})
+
 test("parses chunks from an async stream", async () => {
 	async function* stream() {
 		yield 'a,"b'
@@ -110,6 +157,26 @@ test("parses a browser-style readable stream", async () => {
 	assert.deepEqual(await asyncRows(stream), [
 		["one", "two"],
 		["1", "2"]
+	])
+})
+
+test("parses a Node file stream", async () => {
+	const file = new URL("./fixtures/people.csv", import.meta.url)
+
+	assert.deepEqual(await asyncRows(createReadStream(file)), [
+		["name", "quote"],
+		["Ada", "hello, world"],
+		["Grace", "line one\nline two"]
+	])
+})
+
+test("parses a Node TSV file stream", async () => {
+	const file = new URL("./fixtures/people.tsv", import.meta.url)
+
+	assert.deepEqual(await asyncRows(createReadStream(file), separator("\t")), [
+		["name", "quote"],
+		["Ada", "hello\tworld"],
+		["Grace", "line one\nline two"]
 	])
 })
 
