@@ -1,5 +1,8 @@
 # csv-walker
 
+[![Node.js CI](https://github.com/donatj/csv-walker/actions/workflows/ci.yml/badge.svg)](https://github.com/donatj/csv-walker/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/donatj/csv-walker/badge.svg?branch=dev)](https://coveralls.io/github/donatj/csv-walker?branch=dev)
+
 Small CSV parser for browsers and Node.js.
 
 It has no runtime dependencies. It reads strings, files, and streams. It yields
