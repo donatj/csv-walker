@@ -137,7 +137,8 @@ for (const row of parse("id,name,role\n1,Ada,Engineer\n2,Grace,Admiral")) {
 - Doubled enclosures such as `""`.
 - Optional PHP-style escapes.
 - Unix, Windows, and classic Mac line endings.
-- UTF-8 streams. Characters may cross chunk boundaries.
+- Byte input in any `TextDecoder`-supported encoding; UTF-8 is the default.
+  Characters may cross chunk boundaries.
 
 ## Examples
 
