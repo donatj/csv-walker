@@ -257,3 +257,15 @@ test("decodes Windows-1252 byte chunks", async () => {
 		["café", "€"],
 	]);
 });
+
+test("decodes a Windows-1252 file stream", async () => {
+	const file = new URL("./fixtures/people-win-1252.csv", import.meta.url);
+
+	assert.deepEqual(
+		await asyncRows(createReadStream(file), encoding("windows-1252")),
+		[
+			["name", "quote"],
+			["José", "€10"],
+		],
+	);
+});
