@@ -2,6 +2,25 @@
 	"name": "csv-walker",
 	"version": "0.1.0",
 	"description": "A tiny CSV parser for browsers and Node.js.",
+	"keywords": [
+		"csv",
+		"generator",
+		"parser",
+		"stream",
+		"tsv"
+	],
+	"homepage": "https://github.com/donatj/csv-walker#readme",
+	"bugs": "https://github.com/donatj/csv-walker/issues",
+	"license": "MIT",
+	"author": {
+		"name": "Jesse G. Donat",
+		"email": "donatj@gmail.com",
+		"url": "https://donatstudios.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/donatj/csv-walker.git"
+	},
 	"files": [
 		"dist"
 	],
@@ -21,5 +40,8 @@
 		"oxfmt": "^0.63.0",
 		"oxlint": "^1.78.0",
 		"typescript": "^7.0.2"
+	},
+	"engines": {
+		"node": ">=20"
 	}
 }
