@@ -4,6 +4,7 @@ import { createReadStream } from "node:fs";
 import test from "node:test";
 
 import {
+	allValues,
 	encoding,
 	enclosure,
 	escape,
@@ -43,6 +44,14 @@ test("parses a string", () => {
 		["Ada", "36"],
 		["Grace", "85"],
 	]);
+});
+
+test("collects synchronous rows and columns", () => {
+	assert.deepEqual(allValues(parse("name,age\nAda,36")), [
+		["name", "age"],
+		["Ada", "36"],
+	]);
+	assert.deepEqual(allValues(parse("name,age").next().value), ["name", "age"]);
 });
 
 test("parses quoted columns", () => {
