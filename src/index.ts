@@ -443,3 +443,26 @@ export function parse(
 		? parseString(source, value)
 		: parseSource(source, value);
 }
+
+/**
+ * Collects every column from one row.
+ *
+ * Reads the complete row into memory.
+ */
+export function allValues(values: Row): string[];
+
+/**
+ * Collects every row and column from a synchronous parser.
+ *
+ * Reads the complete input into memory. Avoid it for large data sets.
+ */
+export function allValues(values: Generator<Row>): string[][];
+export function allValues(values: Row | Generator<Row>): string[] | string[][] {
+	const result: Array<string | string[]> = [];
+
+	for (const value of values) {
+		result.push(typeof value === "string" ? value : [...value]);
+	}
+
+	return result as string[] | string[][];
+}

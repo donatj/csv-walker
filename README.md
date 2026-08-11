@@ -129,6 +129,23 @@ for (const row of parse("id,name,role\n1,Ada,Engineer\n2,Grace,Admiral")) {
 // 2
 ```
 
+## Collect values
+
+`allValues()` reads a column generator or a whole row generator into memory.
+Avoid it for large data sets. Iterate instead.
+
+```ts
+import { allValues, parse } from "csv-walker";
+
+const rows = allValues(parse("name,age\nAda,36"));
+// [["name", "age"], ["Ada", "36"]]
+
+for (const row of parse("name,age")) {
+	const columns = allValues(row);
+	// ["name", "age"]
+}
+```
+
 | Input                                                            | Return value                             |
 | ---------------------------------------------------------------- | ---------------------------------------- |
 | String                                                           | `Generator<Generator<string>>`           |
