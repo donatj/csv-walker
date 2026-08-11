@@ -93,6 +93,21 @@ With the default escape, a backslash before the enclosure stays in the value.
 It also keeps that enclosure from closing the field. Use `escape("")` for RFC
 4180 CSV.
 
+## Text encoding
+
+Byte input uses UTF-8 by default. Use `encoding()` for legacy files.
+
+```ts
+import { createReadStream } from "node:fs"
+import { encoding, parse } from "csv-walker"
+
+const rows = parse(createReadStream("legacy.csv"), encoding("windows-1252"))
+```
+
+This affects files, blobs, streams, and byte chunks. It does not affect strings.
+The encoding name is passed to `TextDecoder`, so labels such as `"windows-1252"`
+and `"cp1252"` work where the platform supports them.
+
 ## Streaming
 
 `csv-walker` does not collect the whole input. It does not collect a whole row.

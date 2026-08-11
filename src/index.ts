@@ -15,6 +15,7 @@ export type Row = Generator<string>
 export type AsyncRow = AsyncGenerator<string>
 
 type Settings = {
+	encoding: string
 	separator: string
 	enclosure: string
 	escape: string
@@ -22,7 +23,7 @@ type Settings = {
 
 export type Option = (settings: Settings) => void
 
-function option(name: keyof Settings, value: string, empty = false): Option {
+function option(name: "separator" | "enclosure" | "escape", value: string, empty = false): Option {
 	if ((empty && value === "") || [...value].length === 1) {
 		return (settings) => {
 			settings[name] = value
@@ -42,6 +43,18 @@ export function enclosure(value: string): Option {
 
 export function escape(value: string): Option {
 	return option("escape", value, true)
+}
+
+export function encoding(value: string): Option {
+	try {
+		new TextDecoder(value)
+	} catch {
+		throw new TypeError(`Unknown encoding: ${value}`)
+	}
+
+	return (settings) => {
+		settings.encoding = value
+	}
 }
 
 type Cell = {
@@ -261,7 +274,7 @@ async function* asyncColumns(first: Cell, reader: CSV, characters: AsyncIterator
 }
 
 function settings(options: Option[]): Settings {
-	const value: Settings = { enclosure: '"', escape: "\\", separator: "," }
+	const value: Settings = { encoding: "utf-8", enclosure: '"', escape: "\\", separator: "," }
 
 	for (const option of options) {
 		option(value)
@@ -327,13 +340,13 @@ async function* chunks(source: Source): AsyncGenerator<Chunk> {
 	}
 }
 
-async function* characters(source: Source): AsyncGenerator<string> {
+async function* characters(source: Source, encoding: string): AsyncGenerator<string> {
 	let decoder: TextDecoder | undefined
 
 	for await (const chunk of chunks(source)) {
 		const text = typeof chunk === "string"
 			? `${decoder?.decode() ?? ""}${chunk}`
-			: (decoder ??= new TextDecoder()).decode(chunk, { stream: true })
+			: (decoder ??= new TextDecoder(encoding)).decode(chunk, { stream: true })
 
 		if (typeof chunk === "string") {
 			decoder = undefined
@@ -353,7 +366,7 @@ async function* characters(source: Source): AsyncGenerator<string> {
 
 async function* parseSource(source: Source, options: Settings): AsyncGenerator<AsyncRow> {
 	const reader = csv(options)
-	const input = characters(source)[Symbol.asyncIterator]()
+	const input = characters(source, options.encoding)[Symbol.asyncIterator]()
 
 	try {
 		while (true) {

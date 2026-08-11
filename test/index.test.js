@@ -3,7 +3,7 @@ import { File } from "node:buffer"
 import { createReadStream } from "node:fs"
 import test from "node:test"
 
-import { enclosure, escape, parse, separator } from "../dist/index.js"
+import { encoding, enclosure, escape, parse, separator } from "../dist/index.js"
 
 function rows(source, ...options) {
 	const result = []
@@ -78,6 +78,7 @@ test("configures fgetcsv-style controls", () => {
 	assert.throws(() => separator(""), TypeError)
 	assert.throws(() => enclosure("''"), TypeError)
 	assert.throws(() => escape("\\\\"), TypeError)
+	assert.throws(() => encoding("not-an-encoding"), TypeError)
 })
 
 test("skips unread columns before the next row", () => {
@@ -186,5 +187,17 @@ test("decodes byte chunks", async () => {
 	assert.deepEqual(await asyncRows([bytes.subarray(0, 7), bytes.subarray(7)]), [
 		["name"],
 		["José"]
+	])
+})
+
+test("decodes Windows-1252 byte chunks", async () => {
+	const bytes = new Uint8Array([
+		0x6e, 0x61, 0x6d, 0x65, 0x0a,
+		0x63, 0x61, 0x66, 0xe9, 0x2c, 0x80
+	])
+
+	assert.deepEqual(await asyncRows([bytes], encoding("windows-1252")), [
+		["name"],
+		["café", "€"]
 	])
 })
