@@ -1,36 +1,36 @@
 <!doctype html>
-<meta charset="utf-8">
+<meta charset="utf-8" />
 <title>csv-walker browser example</title>
 
 <p>Build first, then open this page through a local web server.</p>
-<input type="file" accept=".csv,text/csv">
+<input type="file" accept=".csv,text/csv" />
 <pre></pre>
 
 <script type="module">
-	import { parse } from "../dist/index.js"
+	import { parse } from "../dist/index.js";
 
-	const input = document.querySelector("input")
-	const output = document.querySelector("pre")
+	const input = document.querySelector("input");
+	const output = document.querySelector("pre");
 
 	input.addEventListener("change", async () => {
-		const [file] = input.files
+		const [file] = input.files;
 
 		if (!file) {
-			return
+			return;
 		}
 
-		const rows = []
+		const rows = [];
 
 		for await (const row of parse(file)) {
-			const columns = []
+			const columns = [];
 
 			for await (const column of row) {
-				columns.push(column)
+				columns.push(column);
 			}
 
-			rows.push(columns)
+			rows.push(columns);
 		}
 
-		output.textContent = JSON.stringify(rows, undefined, "\t")
-	})
+		output.textContent = JSON.stringify(rows, undefined, "\t");
+	});
 </script>

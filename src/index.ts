@@ -2,398 +2,440 @@
  * csv-walker
  * Copyright (c) 2026 Jesse G. Donat
  * Released under the MIT License.
- * 
+ *
  * This notice may not be removed or altered from any source distribution.
  */
 
-export type Chunk = string | Uint8Array
+export type Chunk = string | Uint8Array;
 
-export type Source = Blob | Iterable<Chunk> | AsyncIterable<Chunk> | ReadableStream<Chunk>
+export type Source =
+	Blob | Iterable<Chunk> | AsyncIterable<Chunk> | ReadableStream<Chunk>;
 
-export type Row = Generator<string>
+export type Row = Generator<string>;
 
-export type AsyncRow = AsyncGenerator<string>
+export type AsyncRow = AsyncGenerator<string>;
 
 type Settings = {
-	encoding: string
-	separator: string
-	enclosure: string
-	escape: string
-}
+	encoding: string;
+	separator: string;
+	enclosure: string;
+	escape: string;
+};
 
-export type Option = (settings: Settings) => void
+export type Option = (settings: Settings) => void;
 
-function option(name: "separator" | "enclosure" | "escape", value: string, empty = false): Option {
+function option(
+	name: "separator" | "enclosure" | "escape",
+	value: string,
+	empty = false,
+): Option {
 	if ((empty && value === "") || [...value].length === 1) {
 		return (settings) => {
-			settings[name] = value
-		}
+			settings[name] = value;
+		};
 	}
 
-	throw new TypeError(`${name} must be one character${empty ? " or empty" : ""}`)
+	throw new TypeError(
+		`${name} must be one character${empty ? " or empty" : ""}`,
+	);
 }
 
 export function separator(value: string): Option {
-	return option("separator", value)
+	return option("separator", value);
 }
 
 export function enclosure(value: string): Option {
-	return option("enclosure", value)
+	return option("enclosure", value);
 }
 
 export function escape(value: string): Option {
-	return option("escape", value, true)
+	return option("escape", value, true);
 }
 
 export function encoding(value: string): Option {
 	try {
-		new TextDecoder(value)
+		new TextDecoder(value);
 	} catch {
-		throw new TypeError(`Unknown encoding: ${value}`)
+		throw new TypeError(`Unknown encoding: ${value}`);
 	}
 
 	return (settings) => {
-		settings.encoding = value
-	}
+		settings.encoding = value;
+	};
 }
 
 type Cell = {
-	last: boolean
-	value: string
-}
+	last: boolean;
+	value: string;
+};
 
 type CSV = {
-	finish: () => Cell | undefined
-	push: (character: string) => Cell | undefined
-}
+	finish: () => Cell | undefined;
+	push: (character: string) => Cell | undefined;
+};
 
-type State = (character: string) => State
+type State = (character: string) => State;
 
 function csv(settings: Settings): CSV {
-	let column = ""
-	let record = false
-	let state: State = readColumn
+	let column = "";
+	let record = false;
+	let state: State = readColumn;
 
 	function push(character: string): Cell | undefined {
-		let cell: Cell | undefined
+		let cell: Cell | undefined;
 
-		state = state(character)
-		cell = output
-		output = undefined
+		state = state(character);
+		cell = output;
+		output = undefined;
 
-		return cell
+		return cell;
 	}
 
 	function finish(): Cell | undefined {
 		if (!record) {
-			return undefined
+			return undefined;
 		}
 
-		const cell = { last: true, value: column }
-		column = ""
-		record = false
+		const cell = { last: true, value: column };
+		column = "";
+		record = false;
 
-		return cell
+		return cell;
 	}
 
-	let output: Cell | undefined
+	let output: Cell | undefined;
 
 	function readColumn(character: string): State {
 		if (character === settings.separator) {
-			record = true
-			columnDone(false)
-			return readColumn
+			record = true;
+			columnDone(false);
+			return readColumn;
 		}
 
 		if (character === "\n") {
-			columnDone(true)
-			return readColumn
+			columnDone(true);
+			return readColumn;
 		}
 
 		if (character === "\r") {
-			columnDone(true)
-			return readLineFeed
+			columnDone(true);
+			return readLineFeed;
 		}
 
 		if (character === settings.enclosure && column === "") {
-			record = true
-			return readQuotedColumn
+			record = true;
+			return readQuotedColumn;
 		}
 
-		record = true
-		column += character
-		return readColumn
+		record = true;
+		column += character;
+		return readColumn;
 	}
 
 	function readQuotedColumn(character: string): State {
 		if (character === settings.enclosure) {
-			return readQuote
+			return readQuote;
 		}
 
 		if (settings.escape !== "" && character === settings.escape) {
-			column += character
-			return readEscapedEnclosure
+			column += character;
+			return readEscapedEnclosure;
 		}
 
-		column += character
-		return readQuotedColumn
+		column += character;
+		return readQuotedColumn;
 	}
 
 	function readQuote(character: string): State {
 		if (character === settings.enclosure) {
-			column += character
-			return readQuotedColumn
+			column += character;
+			return readQuotedColumn;
 		}
 
-		return readColumn(character)
+		return readColumn(character);
 	}
 
 	function readEscapedEnclosure(character: string): State {
-		column += character
-		return readQuotedColumn
+		column += character;
+		return readQuotedColumn;
 	}
 
 	function readLineFeed(character: string): State {
 		if (character === "\n") {
-			return readColumn
+			return readColumn;
 		}
 
-		return readColumn(character)
+		return readColumn(character);
 	}
 
 	function columnDone(last: boolean) {
-		output = { last, value: column }
-		column = ""
+		output = { last, value: column };
+		column = "";
 
 		if (last) {
-			record = false
+			record = false;
 		}
 	}
 
-	return { finish, push }
+	return { finish, push };
 }
 
 function nextCell(reader: CSV, characters: Iterator<string>): Cell | undefined {
 	while (true) {
-		const character = characters.next()
+		const character = characters.next();
 
 		if (character.done) {
-			return reader.finish()
+			return reader.finish();
 		}
 
-		const cell = reader.push(character.value)
+		const cell = reader.push(character.value);
 
 		if (cell) {
-			return cell
+			return cell;
 		}
 	}
 }
 
-async function nextAsyncCell(reader: CSV, characters: AsyncIterator<string>): Promise<Cell | undefined> {
+async function nextAsyncCell(
+	reader: CSV,
+	characters: AsyncIterator<string>,
+): Promise<Cell | undefined> {
 	while (true) {
-		const character = await characters.next()
+		const character = await characters.next();
 
 		if (character.done) {
-			return reader.finish()
+			return reader.finish();
 		}
 
-		const cell = reader.push(character.value)
+		const cell = reader.push(character.value);
 
 		if (cell) {
-			return cell
+			return cell;
 		}
 	}
 }
 
 function skipRow(reader: CSV, characters: Iterator<string>) {
 	while (true) {
-		const cell = nextCell(reader, characters)
+		const cell = nextCell(reader, characters);
 
 		if (!cell || cell.last) {
-			return
+			return;
 		}
 	}
 }
 
 async function skipAsyncRow(reader: CSV, characters: AsyncIterator<string>) {
 	while (true) {
-		const cell = await nextAsyncCell(reader, characters)
+		const cell = await nextAsyncCell(reader, characters);
 
 		if (!cell || cell.last) {
-			return
+			return;
 		}
 	}
 }
 
-function* columns(first: Cell, reader: CSV, characters: Iterator<string>, complete: { value: boolean }): Row {
-	let cell = first
+function* columns(
+	first: Cell,
+	reader: CSV,
+	characters: Iterator<string>,
+	complete: { value: boolean },
+): Row {
+	let cell = first;
 
 	while (true) {
 		if (cell.last) {
-			complete.value = true
+			complete.value = true;
 		}
 
-		yield cell.value
+		yield cell.value;
 
 		if (cell.last) {
-			return
+			return;
 		}
 
-		const next = nextCell(reader, characters)
+		const next = nextCell(reader, characters);
 
 		if (!next) {
-			throw new Error("CSV ended before the record did")
+			throw new Error("CSV ended before the record did");
 		}
 
-		cell = next
+		cell = next;
 	}
 }
 
-async function* asyncColumns(first: Cell, reader: CSV, characters: AsyncIterator<string>, complete: { value: boolean }): AsyncRow {
-	let cell = first
+async function* asyncColumns(
+	first: Cell,
+	reader: CSV,
+	characters: AsyncIterator<string>,
+	complete: { value: boolean },
+): AsyncRow {
+	let cell = first;
 
 	while (true) {
 		if (cell.last) {
-			complete.value = true
+			complete.value = true;
 		}
 
-		yield cell.value
+		yield cell.value;
 
 		if (cell.last) {
-			return
+			return;
 		}
 
-		const next = await nextAsyncCell(reader, characters)
+		const next = await nextAsyncCell(reader, characters);
 
 		if (!next) {
-			throw new Error("CSV ended before the record did")
+			throw new Error("CSV ended before the record did");
 		}
 
-		cell = next
+		cell = next;
 	}
 }
 
 function settings(options: Option[]): Settings {
-	const value: Settings = { encoding: "utf-8", enclosure: '"', escape: "\\", separator: "," }
+	const value: Settings = {
+		encoding: "utf-8",
+		enclosure: '"',
+		escape: "\\",
+		separator: ",",
+	};
 
 	for (const option of options) {
-		option(value)
+		option(value);
 	}
 
-	return value
+	return value;
 }
 
 function* parseString(text: string, options: Settings): Generator<Row> {
-	const reader = csv(options)
-	const characters = text[Symbol.iterator]()
+	const reader = csv(options);
+	const characters = text[Symbol.iterator]();
 
 	while (true) {
-		const first = nextCell(reader, characters)
+		const first = nextCell(reader, characters);
 
 		if (!first) {
-			return
+			return;
 		}
 
-		const complete = { value: first.last }
-		yield columns(first, reader, characters, complete)
+		const complete = { value: first.last };
+		yield columns(first, reader, characters, complete);
 
 		if (!complete.value) {
-			skipRow(reader, characters)
+			skipRow(reader, characters);
 		}
 	}
 }
 
 function isBlob(source: Source): source is Blob {
-	return typeof Blob !== "undefined" && source instanceof Blob
+	return typeof Blob !== "undefined" && source instanceof Blob;
 }
 
 async function* chunks(source: Source): AsyncGenerator<Chunk> {
 	if (isBlob(source)) {
-		yield* chunks(source.stream())
-		return
+		yield* chunks(source.stream());
+		return;
 	}
 
 	if (Symbol.asyncIterator in source) {
-		yield* source as AsyncIterable<Chunk>
-		return
+		yield* source as AsyncIterable<Chunk>;
+		return;
 	}
 
 	if (Symbol.iterator in source) {
-		yield* source as Iterable<Chunk>
-		return
+		yield* source as Iterable<Chunk>;
+		return;
 	}
 
-	const reader = (source as ReadableStream<Chunk>).getReader()
+	const reader = (source as ReadableStream<Chunk>).getReader();
 
 	try {
 		while (true) {
-			const { done, value } = await reader.read()
+			const { done, value } = await reader.read();
 
 			if (done) {
-				return
+				return;
 			}
 
-			yield value
+			yield value;
 		}
 	} finally {
-		reader.releaseLock()
+		reader.releaseLock();
 	}
 }
 
-async function* characters(source: Source, encoding: string): AsyncGenerator<string> {
-	let decoder: TextDecoder | undefined
+async function* characters(
+	source: Source,
+	encoding: string,
+): AsyncGenerator<string> {
+	let decoder: TextDecoder | undefined;
 
 	for await (const chunk of chunks(source)) {
-		const text = typeof chunk === "string"
-			? `${decoder?.decode() ?? ""}${chunk}`
-			: (decoder ??= new TextDecoder(encoding)).decode(chunk, { stream: true })
+		const text =
+			typeof chunk === "string"
+				? `${decoder?.decode() ?? ""}${chunk}`
+				: (decoder ??= new TextDecoder(encoding)).decode(chunk, {
+						stream: true,
+					});
 
 		if (typeof chunk === "string") {
-			decoder = undefined
+			decoder = undefined;
 		}
 
 		for (const character of text) {
-			yield character
+			yield character;
 		}
 	}
 
 	if (decoder) {
 		for (const character of decoder.decode()) {
-			yield character
+			yield character;
 		}
 	}
 }
 
-async function* parseSource(source: Source, options: Settings): AsyncGenerator<AsyncRow> {
-	const reader = csv(options)
-	const input = characters(source, options.encoding)[Symbol.asyncIterator]()
+async function* parseSource(
+	source: Source,
+	options: Settings,
+): AsyncGenerator<AsyncRow> {
+	const reader = csv(options);
+	const input = characters(source, options.encoding)[Symbol.asyncIterator]();
 
 	try {
 		while (true) {
-			const first = await nextAsyncCell(reader, input)
+			const first = await nextAsyncCell(reader, input);
 
 			if (!first) {
-				return
+				return;
 			}
 
-			const complete = { value: first.last }
-			yield asyncColumns(first, reader, input, complete)
+			const complete = { value: first.last };
+			yield asyncColumns(first, reader, input, complete);
 
 			if (!complete.value) {
-				await skipAsyncRow(reader, input)
+				await skipAsyncRow(reader, input);
 			}
 		}
 	} finally {
 		if (input.return) {
-			await input.return(undefined)
+			await input.return(undefined);
 		}
 	}
 }
 
-export function parse(source: string, ...options: Option[]): Generator<Row>
-export function parse(source: Source, ...options: Option[]): AsyncGenerator<AsyncRow>
-export function parse(source: string | Source, ...options: Option[]): Generator<Row> | AsyncGenerator<AsyncRow> {
-	const value = settings(options)
+export function parse(source: string, ...options: Option[]): Generator<Row>;
+export function parse(
+	source: Source,
+	...options: Option[]
+): AsyncGenerator<AsyncRow>;
+export function parse(
+	source: string | Source,
+	...options: Option[]
+): Generator<Row> | AsyncGenerator<AsyncRow> {
+	const value = settings(options);
 
-	return typeof source === "string" ? parseString(source, value) : parseSource(source, value)
+	return typeof source === "string"
+		? parseString(source, value)
+		: parseSource(source, value);
 }

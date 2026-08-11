@@ -19,10 +19,10 @@ npm install csv-walker
 Strings use synchronous generators. Each row yields column strings.
 
 ```ts
-import { parse } from "csv-walker"
+import { parse } from "csv-walker";
 
 for (const row of parse("name,age\nAda,36\nGrace,85")) {
-	console.log([...row])
+	console.log([...row]);
 }
 
 // ["name", "age"]
@@ -36,17 +36,17 @@ Files and streams use async generators. Use `for await...of` for rows and
 columns.
 
 ```ts
-import { createReadStream } from "node:fs"
-import { parse } from "csv-walker"
+import { createReadStream } from "node:fs";
+import { parse } from "csv-walker";
 
 for await (const row of parse(createReadStream("people.csv"))) {
-	const person = []
+	const person = [];
 
 	for await (const column of row) {
-		person.push(column)
+		person.push(column);
 	}
 
-	console.log(person)
+	console.log(person);
 }
 ```
 
@@ -56,14 +56,14 @@ Pass a browser `File` to `parse()`.
 
 ```ts
 input.addEventListener("change", async () => {
-	const [file] = input.files
+	const [file] = input.files;
 
 	for await (const row of parse(file)) {
 		for await (const column of row) {
-			console.log(column)
+			console.log(column);
 		}
 	}
-})
+});
 ```
 
 See [`examples/browser.html`](examples/browser.html) for a complete file-picker
@@ -75,18 +75,18 @@ usually do not load from `file://` URLs.
 Controls use a Go-style option pattern. The defaults match PHP `fgetcsv`.
 
 ```ts
-import { enclosure, escape, parse, separator } from "csv-walker"
+import { enclosure, escape, parse, separator } from "csv-walker";
 
 for (const row of parse(input, separator(";"), enclosure("'"), escape(""))) {
-	console.log([...row])
+	console.log([...row]);
 }
 ```
 
-| Option | Default | Use |
-| --- | --- | --- |
-| `separator(value)` | `","` | Set the field separator. |
-| `enclosure(value)` | `"\""` | Set the quoted-field character. |
-| `escape(value)` | `"\\"` | Set the PHP-style escape. Pass `""` to turn it off. |
+| Option             | Default | Use                                                 |
+| ------------------ | ------- | --------------------------------------------------- |
+| `separator(value)` | `","`   | Set the field separator.                            |
+| `enclosure(value)` | `"\""`  | Set the quoted-field character.                     |
+| `escape(value)`    | `"\\"`  | Set the PHP-style escape. Pass `""` to turn it off. |
 
 Separators and enclosures take one character. Escapes take one character or an
 empty string. Doubled enclosures work. `"said ""hello"""` becomes
@@ -101,10 +101,10 @@ It also keeps that enclosure from closing the field. Use `escape("")` for RFC
 Byte input uses UTF-8 by default. Use `encoding()` for legacy files.
 
 ```ts
-import { createReadStream } from "node:fs"
-import { encoding, parse } from "csv-walker"
+import { createReadStream } from "node:fs";
+import { encoding, parse } from "csv-walker";
 
-const rows = parse(createReadStream("legacy.csv"), encoding("windows-1252"))
+const rows = parse(createReadStream("legacy.csv"), encoding("windows-1252"));
 ```
 
 This affects files, blobs, streams, and byte chunks. It does not affect strings.
@@ -121,7 +121,7 @@ the current row.
 
 ```ts
 for (const row of parse("id,name,role\n1,Ada,Engineer\n2,Grace,Admiral")) {
-	console.log(row.next().value)
+	console.log(row.next().value);
 }
 
 // id
@@ -129,9 +129,9 @@ for (const row of parse("id,name,role\n1,Ada,Engineer\n2,Grace,Admiral")) {
 // 2
 ```
 
-| Input | Return value |
-| --- | --- |
-| String | `Generator<Generator<string>>` |
+| Input                                                            | Return value                             |
+| ---------------------------------------------------------------- | ---------------------------------------- |
+| String                                                           | `Generator<Generator<string>>`           |
 | `File`, `Blob`, `ReadableStream`, Node stream, or chunk iterable | `AsyncGenerator<AsyncGenerator<string>>` |
 
 ## Supported CSV
