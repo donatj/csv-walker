@@ -9,7 +9,10 @@
 export type Chunk = string | Uint8Array;
 
 export type Source =
-	Blob | Iterable<Chunk> | AsyncIterable<Chunk> | ReadableStream<Chunk>;
+	| Blob
+	| Iterable<Chunk>
+	| AsyncIterable<Chunk>
+	| ReadableStream<Chunk>;
 
 export type Row = Generator<string>;
 
@@ -376,7 +379,7 @@ async function* characters(
 		const text =
 			typeof chunk === "string"
 				? `${decoder?.decode() ?? ""}${chunk}`
-					: (decoder ??= new TextDecoder(label)).decode(chunk, {
+				: (decoder ??= new TextDecoder(label)).decode(chunk, {
 						stream: true,
 					});
 
