@@ -54,7 +54,8 @@ export function escape(value: string): Option {
 
 export function encoding(value: string): Option {
 	try {
-		new TextDecoder(value);
+		const decoder = new TextDecoder(value);
+		decoder.decode();
 	} catch {
 		throw new TypeError(`Unknown encoding: ${value}`);
 	}
@@ -180,9 +181,9 @@ function csv(settings: Settings): CSV {
 	return { finish, push };
 }
 
-function nextCell(reader: CSV, characters: Iterator<string>): Cell | undefined {
+function nextCell(reader: CSV, input: Iterator<string>): Cell | undefined {
 	while (true) {
-		const character = characters.next();
+		const character = input.next();
 
 		if (character.done) {
 			return reader.finish();
@@ -198,10 +199,10 @@ function nextCell(reader: CSV, characters: Iterator<string>): Cell | undefined {
 
 async function nextAsyncCell(
 	reader: CSV,
-	characters: AsyncIterator<string>,
+	input: AsyncIterator<string>,
 ): Promise<Cell | undefined> {
 	while (true) {
-		const character = await characters.next();
+		const character = await input.next();
 
 		if (character.done) {
 			return reader.finish();
@@ -215,9 +216,9 @@ async function nextAsyncCell(
 	}
 }
 
-function skipRow(reader: CSV, characters: Iterator<string>) {
+function skipRow(reader: CSV, input: Iterator<string>) {
 	while (true) {
-		const cell = nextCell(reader, characters);
+		const cell = nextCell(reader, input);
 
 		if (!cell || cell.last) {
 			return;
@@ -225,9 +226,9 @@ function skipRow(reader: CSV, characters: Iterator<string>) {
 	}
 }
 
-async function skipAsyncRow(reader: CSV, characters: AsyncIterator<string>) {
+async function skipAsyncRow(reader: CSV, input: AsyncIterator<string>) {
 	while (true) {
-		const cell = await nextAsyncCell(reader, characters);
+		const cell = await nextAsyncCell(reader, input);
 
 		if (!cell || cell.last) {
 			return;
@@ -238,7 +239,7 @@ async function skipAsyncRow(reader: CSV, characters: AsyncIterator<string>) {
 function* columns(
 	first: Cell,
 	reader: CSV,
-	characters: Iterator<string>,
+	input: Iterator<string>,
 	complete: { value: boolean },
 ): Row {
 	let cell = first;
@@ -254,7 +255,7 @@ function* columns(
 			return;
 		}
 
-		const next = nextCell(reader, characters);
+		const next = nextCell(reader, input);
 
 		if (!next) {
 			throw new Error("CSV ended before the record did");
@@ -267,7 +268,7 @@ function* columns(
 async function* asyncColumns(
 	first: Cell,
 	reader: CSV,
-	characters: AsyncIterator<string>,
+	input: AsyncIterator<string>,
 	complete: { value: boolean },
 ): AsyncRow {
 	let cell = first;
@@ -283,7 +284,7 @@ async function* asyncColumns(
 			return;
 		}
 
-		const next = await nextAsyncCell(reader, characters);
+		const next = await nextAsyncCell(reader, input);
 
 		if (!next) {
 			throw new Error("CSV ended before the record did");
@@ -293,7 +294,7 @@ async function* asyncColumns(
 	}
 }
 
-function settings(options: Option[]): Settings {
+function configure(options: Option[]): Settings {
 	const value: Settings = {
 		encoding: "utf-8",
 		enclosure: '"',
@@ -301,8 +302,8 @@ function settings(options: Option[]): Settings {
 		separator: ",",
 	};
 
-	for (const option of options) {
-		option(value);
+	for (const apply of options) {
+		apply(value);
 	}
 
 	return value;
@@ -310,20 +311,20 @@ function settings(options: Option[]): Settings {
 
 function* parseString(text: string, options: Settings): Generator<Row> {
 	const reader = csv(options);
-	const characters = text[Symbol.iterator]();
+	const input = text[Symbol.iterator]();
 
 	while (true) {
-		const first = nextCell(reader, characters);
+		const first = nextCell(reader, input);
 
 		if (!first) {
 			return;
 		}
 
 		const complete = { value: first.last };
-		yield columns(first, reader, characters, complete);
+		yield columns(first, reader, input, complete);
 
 		if (!complete.value) {
-			skipRow(reader, characters);
+			skipRow(reader, input);
 		}
 	}
 }
@@ -367,7 +368,7 @@ async function* chunks(source: Source): AsyncGenerator<Chunk> {
 
 async function* characters(
 	source: Source,
-	encoding: string,
+	label: string,
 ): AsyncGenerator<string> {
 	let decoder: TextDecoder | undefined;
 
@@ -375,7 +376,7 @@ async function* characters(
 		const text =
 			typeof chunk === "string"
 				? `${decoder?.decode() ?? ""}${chunk}`
-				: (decoder ??= new TextDecoder(encoding)).decode(chunk, {
+					: (decoder ??= new TextDecoder(label)).decode(chunk, {
 						stream: true,
 					});
 
@@ -433,7 +434,7 @@ export function parse(
 	source: string | Source,
 	...options: Option[]
 ): Generator<Row> | AsyncGenerator<AsyncRow> {
-	const value = settings(options);
+	const value = configure(options);
 
 	return typeof source === "string"
 		? parseString(source, value)
